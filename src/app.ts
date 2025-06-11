@@ -6,6 +6,10 @@ const app: Express = express();
 
 app.use(express.json({ limit: '50mb' }));
 
+app.get('/',(req, res) => {
+    res.status(200).json({ message: 'Welcome to bitespeed' });
+});
+
 app.use('/api/v1', apiRoutes);
 
 const startApp = (port: number): Server => {
