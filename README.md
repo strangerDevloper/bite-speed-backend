@@ -29,7 +29,13 @@ DB_PASSWORD=postgres
 DB_NAME=bite_speed_db
 ```
 
-4. Start the development server:
+4. **Run TypeORM migrations to set up the database schema:**
+```bash
+npm run typeorm migration:run -- -d ./src/config/db.ts
+```
+> This will create all necessary tables in your database as per the latest migrations.
+
+5. Start the development server:
 ```bash
 npm run dev
 ```
@@ -39,6 +45,7 @@ npm run dev
 - `npm run dev`: Starts the development server with hot-reload using ts-node-dev
 - `npm run build`: Builds the TypeScript code to JavaScript
 - `npm start`: Runs the built code in production
+- `npm run typeorm migration:run`: Runs all pending TypeORM migrations
 
 ## Project Structure
 
@@ -84,4 +91,4 @@ The server includes:
 - Graceful shutdown handling
 - Database connection management
 - Socket cleanup
-- Request timeout handling (55s timeout) 
+- Request timeout handling (55s timeout)
