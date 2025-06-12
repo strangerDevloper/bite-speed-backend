@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { ContactPayload } from './contacts.interface';
+import { ContactPayload, IdentifyContactRequest } from './contacts.interface';
 import { ContactsService } from './contacts.service';
 
 export class ContactsController {
@@ -13,25 +13,27 @@ export class ContactsController {
 
     public async getContacts(req: Request, res: Response) {
         try {
-            const contacts = [];
+            const contacts = await this.contactsService.getAllContacts();
             res.status(200).json(contacts);
         } catch (error) {
             res.status(500).json({ error: 'Failed to retrieve contacts' });
         }
     }
 
-    public async identifyContact(req: Request, res: Response) {
+    public async identifyContact(
+        req: Request<unknown, unknown, IdentifyContactRequest, unknown>,
+        res: Response
+    ) {
         try {
-            const { email } = req.query;
+            const { email, phoneNumber } = req.body;
             // Logic to identify contact by email
-            if (!email) {
-                res.status(400).json({ error: 'Email query parameter is required' });
+            if (!email && !phoneNumber) {
+                return res.status(400).json({ error: 'Email query parameter is required' });
             }
-            // Replace with actual identification logic
-            const contact = { email }; // Mock contact data
-            res.status(200).json(contact);
+            const contact = await this.contactsService.identifyContact(req.body);
+            return res.status(200).json(contact);
         } catch (error) {
-            res.status(500).json({ error: 'Failed to identify contact' });
+            return res.status(500).json({ error: 'Failed to identify contact' });
         }
     }
 

@@ -1,11 +1,110 @@
 import { getRepository } from "typeorm";
 import { Contact } from "../../entities/Contacts";
-import { ContactPayload } from "./contacts.interface";
+import { ContactPayload, IdentifyContactRequest, IdentifyContactResponse } from "./contacts.interface";
 import { LinkPrecedence } from "../../entities/types";
 
 export class ContactsService {
+    public async getAllContacts(): Promise<Contact[]> {
+        try {
+            const contactRepo = getRepository(Contact);
+            // Fetch all contacts ordered by creation date
+            return await contactRepo.find({
+                order: { createdAt: "ASC" }
+            });
+        } catch (error) {
+            console.error("Error fetching contacts:", error);
+            throw new Error("Failed to fetch contacts");
+        }
+    }
+
+    public async identifyContact(contactPayload: IdentifyContactRequest): Promise<IdentifyContactResponse | null> {
+        try {
+            const contactRepo = getRepository(Contact);
+
+            // 1. Find all contacts matching the provided email or phone number
+            const matchingContacts = await this.findMatchingContacts(contactRepo, contactPayload);
+
+            if (matchingContacts.length === 0) {
+                return null;
+            }
+
+            // 2. Find the primary contact (root)
+            const primaryContact = await this.findPrimaryContact(contactRepo, matchingContacts);
+
+            console.log("Primary contact identified:", primaryContact);
+            // 3. Find all contacts linked to this primary (including itself)
+            const allRelatedContacts = await this.findAllRelatedContacts(contactRepo, primaryContact);
+
+            // 4. Build the response
+            return this.buildIdentifyContactResponse(primaryContact, allRelatedContacts);
+        } catch (error) {
+            console.error("Error identifying contact:", error);
+            throw new Error("Failed to identify contact");
+        }
+    }
+
+    private async findMatchingContacts(contactRepo: any, contactPayload: IdentifyContactRequest): Promise<Contact[]> {
+        const whereClause = [];
+        if (contactPayload.email) whereClause.push({ email: contactPayload.email });
+        if (contactPayload.phoneNumber) whereClause.push({ phoneNumber: contactPayload.phoneNumber });
+        if (whereClause.length === 0) return [];
+        return contactRepo.find({
+            where: whereClause,
+            order: { createdAt: "ASC" }
+        });
+    }
+
+    private async findPrimaryContact(contactRepo: any, contacts: Contact[]): Promise<Contact> {
+        // Find the oldest primary, or fallback to the first contact
+        let primary = contacts.find(c => c.linkPrecedence === LinkPrecedence.PRIMARY) || contacts[0];
+        // If this contact is secondary, fetch its primary
+        if (primary.linkedId) {
+            const root = await contactRepo.findOne({ where: { id: primary.linkedId } });
+            if (root) primary = root;
+        }
+        return primary;
+    }
+
+    private async findAllRelatedContacts(contactRepo: any, primaryContact: Contact): Promise<Contact[]> {
+        return contactRepo.find({
+            where: [
+                { id: primaryContact.id },
+                { linkedId: primaryContact.id }
+            ],
+            order: { createdAt: "ASC" }
+        });
+    }
+
+    private buildIdentifyContactResponse(primaryContact: Contact, allRelatedContacts: Contact[]): IdentifyContactResponse {
+        const emails: string[] = [];
+        const phoneNumbers: string[] = [];
+        const secondaryContactIds: number[] = [];
+
+        // Always put primary's email/phone first
+        if (primaryContact.email) emails.push(primaryContact.email);
+        if (primaryContact.phoneNumber) phoneNumbers.push(primaryContact.phoneNumber);
+
+        for (const contact of allRelatedContacts) {
+            if (contact.id === primaryContact.id) continue;
+            if (contact.email && !emails.includes(contact.email)) emails.push(contact.email);
+            if (contact.phoneNumber && !phoneNumbers.includes(contact.phoneNumber)) phoneNumbers.push(contact.phoneNumber);
+            if (contact.linkPrecedence === LinkPrecedence.SECONDARY) {
+                secondaryContactIds.push(contact.id);
+            }
+        }
+
+        return {
+            contact: {
+                primaryContactId: primaryContact.id,
+                emails,
+                phoneNumbers,
+                secondaryContactIds
+            }
+        };
+    }
+
     public async createContact(contactPayload: ContactPayload): Promise<Contact> {
-        try {            
+        try {
             const contactRepo = getRepository(Contact);
 
             const matchingContacts = await this.findAllMatchingContacts(contactRepo, contactPayload);
