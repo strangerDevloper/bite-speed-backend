@@ -11,6 +11,7 @@ export default {
     database: process.env.DB_NAME!,
     synchronize: false,
     logging: true,
+    ssl: { rejectUnauthorized: false },
     entities: ['src/entities/*.ts'],
     migrations: ['src/migrations/*.ts'],
     cli: {
